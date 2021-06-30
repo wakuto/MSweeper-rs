@@ -1,11 +1,13 @@
 use std::io::Write;
 use rand::{Rng, thread_rng};
+use ncurses::*;
 
 
 #[derive(Copy, Clone, PartialEq)]
 enum Dot {
   Mine,
   Safe(u8),
+  Flag(bool),
   Null,
 }
 
@@ -60,13 +62,14 @@ struct Field {
   field: Vec<Vec<Dot>>,
   opened: Vec<Vec<bool>>,
   opennum: i32,
+  position: Point,
 }
 
 impl Field {
-  fn new(x_size: usize, y_size: usize, mines: u8) -> Field {
+  fn new(x_size: usize, y_size: usize, mines: u8, pos: Point) -> Field {
     let field = vec![vec![Dot::Null; x_size]; y_size];
     let opened = vec![vec![false; x_size]; y_size];
-    let mut obj = Field { x_size: x_size, y_size: y_size, mines: mines, field: field, opened: opened, opennum: 0};
+    let mut obj = Field { x_size: x_size, y_size: y_size, mines: mines, field: field, opened: opened, opennum: 0, position: pos};
     obj.init();
     obj
   }
@@ -179,15 +182,10 @@ impl Field {
   }
 
   fn print(&self) {
-    print!("   ");
-    for x in 0..self.x_size {
-      print!("{:>3}", x);
-    }
-    println!("");
     for y in 0..self.y_size {
-      print!("{:>3}", y);
+      mv(self.position.y as i32 + y as i32, self.position.x as i32);
       for x in 0..self.x_size {
-        print!("{:>3}", match self.opened[y][x] {
+        waddstr(stdscr(), &match self.opened[y][x] {
           true => { 
             match &self.field[y][x] {
               Dot::Mine => "x".to_string(),
@@ -200,11 +198,17 @@ impl Field {
               _ => "_".to_string(),
             }
           },
-          false => ".".to_string(),
+          false => {
+            match &self.field[y][x] {
+              Dot::Flag(_) => "f".to_string(),
+              _ => ".".to_string(),
+            }
+          },
         });
       }
-      println!("");
     }
+    mv(self.position.y as i32, self.position.x as i32);
+    refresh();
   }
   
   fn is_opened(&self, pos: Point) -> bool {
@@ -213,6 +217,9 @@ impl Field {
 
   // 1点あける
   fn open(&mut self, pos: Point) -> bool {
+    if pos.x >= self.x_size || pos.y >= self.y_size {
+      return true;
+    }
     let res = match &self.field[pos.y][pos.x] {
       Dot::Mine => false,
       _ => true,
@@ -225,6 +232,18 @@ impl Field {
       self.opennum += 1;
     }
     res
+  }
+
+  fn open_around(&mut self, pos:Point) {
+    let (up, right, down, left) = self.get_around(pos);
+    self.opened[up][left] = true;
+    self.opened[up][pos.x] = true;
+    self.opened[up][right] = true;
+    self.opened[pos.y][left] = true;
+    self.opened[pos.y][right] = true;
+    self.opened[down][left] = true;
+    self.opened[down][pos.x] = true;
+    self.opened[down][right] = true;
   }
 
   // あけて、0だったときに周りの0もあける
@@ -252,25 +271,75 @@ impl Field {
       if !self.is_opened(left) {
         self.open_if_zero(left);
       }
+      self.open_around(pos);
     }
     res
   }
-}
-fn main() {
-  let mut field = Field::new(10,10,5);
-  field.print();
 
+  fn set_flag(&mut self, pos: Point) {
+    let exist_mine = match self.field[pos.y][pos.x] {
+      Dot::Mine => true,
+      _ => false,
+    };
+    self.field[pos.y][pos.x] = Dot::Flag(exist_mine);
+  }
+  fn open_count(&self) -> u32 {
+    let mut cnt = 0;
+    for y in 0..self.y_size {
+      for x in 0..self.x_size {
+        if self.opened[y][x] {
+          cnt += 1;
+        }
+      }
+    }
+    cnt
+  }
+}
+
+fn main() {
+  let window = initscr();
+  noecho();
+  nonl();
+  intrflush(stdscr(), true);
+  keypad(stdscr(), true);
+  addstr("***MSweeper***");
+  refresh();
+
+  let mut field = Field::new(10,10,5,Point::new(1,1));
+
+  const KEY_QUIT: i32 = b'q' as i32;
+  const KEY_OPEN: i32 = b'o' as i32;
+  const KEY_FLAG: i32 = b'f' as i32;
+
+  let mut x = 0;
+  let mut y = 0;
+  let mut res = true;
   loop {
-    let pos = Point::input();
-    let res = field.open(pos);
     field.print();
+    mv((field.position.y + y) as i32, (field.position.x + x) as i32);
+    match getch() {
+      KEY_RIGHT => x += 1,
+      KEY_LEFT => if x > 0 {x -= 1},
+      KEY_DOWN => y += 1,
+      KEY_UP => if y > 0 {y -= 1},
+      KEY_OPEN => {res = field.open(Point::new(x, y));},
+      KEY_QUIT => {endwin(); return;},
+      KEY_FLAG => {field.set_flag(Point::new(x, y));},
+      _ => continue,
+    };
+    mv((field.position.y + y) as i32, (field.position.x + x) as i32);
     if !res {
-      println!("you lose!");
+      mv(20, 0);
+      waddstr(stdscr(), "You Lose...");
       break;
     }
-    if field.opennum >= (field.x_size * field.y_size) as i32 - (field.mines as i32) {
-      println!("you win!");
+    if (field.x_size as u32 * field.y_size as u32 - field.open_count()) == field.mines as u32 {
+      mv(20, 0);
+      waddstr(stdscr(), "You Win!!!");
       break;
     }
   }
+  while getch() != KEY_QUIT {
+  }
+  endwin();
 }
