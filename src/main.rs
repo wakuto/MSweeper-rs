@@ -1,5 +1,7 @@
 //use rand::{Rng, thread_rng};
 use rand::{seq::SliceRandom, thread_rng};
+use std::time::Instant;
+use std::{env, fs};
 use ncurses::*;
 
 
@@ -131,8 +133,14 @@ impl Field {
   }
 
   fn print(&self) {
+    mv(self.position.y as i32 -1, self.position.x as i32);
+    for _ in 0..self.x_size {
+      waddstr(stdscr(), "-");
+    }
     for y in 0..self.y_size {
-      mv(self.position.y as i32 + y as i32, self.position.x as i32);
+      mv((self.position.y + y) as i32, self.position.x as i32 -1);
+      waddstr(stdscr(), "|");
+      mv((self.position.y + y) as i32, self.position.x as i32);
       for x in 0..self.x_size {
         waddstr(stdscr(), &match self.opened[y][x] {
           true => { 
@@ -155,6 +163,11 @@ impl Field {
           },
         });
       }
+      waddstr(stdscr(), "|");
+    }
+    mv((self.position.y + self.y_size) as i32, self.position.x as i32);
+    for _ in 0..self.x_size {
+      waddstr(stdscr(), "-");
     }
     mv(self.position.y as i32, self.position.x as i32);
     refresh();
@@ -204,38 +217,20 @@ impl Field {
       self.opennum += 1;
 
       let (up, right, down, left) = self.get_around(pos);
-      let mut direction: Vec<Point> = vec![Point::new(right, up)];
-      let upright = Point::new(right, up);
-      let downright = Point::new(right, down);
-      let downleft = Point::new(left, down);
-      let upleft = Point::new(left, up);
-      let up = Point::new(pos.x, up);
-      let right = Point::new(right, pos.y);
-      let down = Point::new(pos.x, down);
-      let left = Point::new(left, pos.y);
-      if !self.is_opened(up) {
-        self.open_if_zero(up);
-      }
-      if !self.is_opened(upright) {
-        self.open_if_zero(upright);
-      }
-      if !self.is_opened(right) {
-        self.open_if_zero(right);
-      }
-      if !self.is_opened(downright) {
-        self.open_if_zero(downright);
-      }
-      if !self.is_opened(down) {
-        self.open_if_zero(down);
-      }
-      if !self.is_opened(downleft) {
-        self.open_if_zero(downleft);
-      }
-      if !self.is_opened(left) {
-        self.open_if_zero(left);
-      }
-      if !self.is_opened(upleft) {
-        self.open_if_zero(upleft);
+      let directions: Vec<Point> = vec![
+        Point::new(right, up),
+        Point::new(right, down),
+        Point::new(left, down),
+        Point::new(left, up),
+        Point::new(pos.x, up),
+        Point::new(right, pos.y),
+        Point::new(pos.x, down),
+        Point::new(left, pos.y)
+      ];
+      for dir in directions {
+        if !self.is_opened(dir) {
+          self.open_if_zero(dir);
+        }
       }
       self.open_around(pos);
     }
@@ -247,7 +242,9 @@ impl Field {
       Dot::Mine => true,
       _ => false,
     };
-    self.field[pos.y][pos.x] = Dot::Flag(exist_mine);
+    if !self.opened[pos.y][pos.x] {
+      self.field[pos.y][pos.x] = Dot::Flag(exist_mine);
+    }
   }
 
   fn open_count(&self) -> u32 {
@@ -264,6 +261,23 @@ impl Field {
 }
 
 fn main() {
+  let args: Vec<String> = env::args().collect();
+  let fieldpos = Point::new(5,5);
+  let x_size;
+  let y_size;
+  let mines;
+  let scoreable;
+  if args.len() == 4 {
+    x_size = args[1].parse().expect("不正な引数です。x_size y_size minesの順に指定してください。");
+    y_size = args[2].parse().expect("不正な引数です。x_size y_size minesの順に指定してください。");
+    mines = args[3].parse().expect("不正な引数です。x_size y_size minesの順に指定してください。");
+    scoreable = false;
+  } else {
+    x_size = 10;
+    y_size = 8;
+    mines = 10;
+    scoreable = true;
+  }
   let _window = initscr();
   noecho();
   nonl();
@@ -272,7 +286,7 @@ fn main() {
   addstr("***MSweeper***");
   refresh();
 
-  let mut field = Field::new(10,10,5,Point::new(1,1));
+  let mut field = Field::new(x_size,y_size,mines,fieldpos);
 
   const KEY_QUIT: i32 = b'q' as i32;
   const KEY_OPEN: i32 = b'o' as i32;
@@ -281,28 +295,61 @@ fn main() {
   let mut x = 0;
   let mut y = 0;
   let mut res = true;
+  let start = Instant::now();
   loop {
     field.print();
     mv((field.position.y + y) as i32, (field.position.x + x) as i32);
+
+    // キー入力
     match getch() {
-      KEY_RIGHT => x += 1,
+      KEY_RIGHT => if x < field.x_size-1 {x += 1},
       KEY_LEFT => if x > 0 {x -= 1},
-      KEY_DOWN => y += 1,
+      KEY_DOWN => if y < field.y_size-1 {y += 1},
       KEY_UP => if y > 0 {y -= 1},
       KEY_OPEN => {res = field.open(Point::new(x, y));},
       KEY_QUIT => {endwin(); return;},
       KEY_FLAG => {field.set_flag(Point::new(x, y));},
       _ => continue,
     };
-    mv((field.position.y + y) as i32, (field.position.x + x) as i32);
+
+    // 負け
     if !res {
-      mv(20, 0);
+      mv((y_size+fieldpos.y+5) as i32, 0);
       waddstr(stdscr(), "You Lose...");
       break;
     }
-    if (field.x_size as u32 * field.y_size as u32 - field.open_count()) == field.mines as u32 {
-      mv(20, 0);
+    // クリア
+    if ((field.x_size * field.y_size) as u32 - field.open_count()) == field.mines as u32 {
+      let end = start.elapsed();
+      mv((y_size+fieldpos.y+5) as i32, 0);
       waddstr(stdscr(), "You Win!!!");
+      mv((y_size+fieldpos.y+6) as i32, 0);
+      waddstr(stdscr(), &format!("Time:{}s", end.as_secs()));
+      if !scoreable {
+        break;
+      }
+      let score_file = match fs::read_to_string("./highscore.dat") {
+        Ok(val) => val.trim().to_string(),
+        _ => "".to_string(),
+      };
+      let score = end.as_secs();
+      let high;
+      if score_file != "" {
+        let score_str: Vec<&str> = score_file.split('\n').collect::<Vec<&str>>();
+        let mut scores: Vec<u64> = score_str.iter().map(|x| x.parse()
+          .expect("highscore.datの形式が違います。")).collect();
+        scores.sort();
+        high = scores[scores.len()-1];
+      } else {
+        high = u64::MAX;
+      }
+      if high > score {
+        mv((y_size+fieldpos.y+7) as i32, 0);
+        waddstr(stdscr(), "highscore!!!");
+        let new_score_file = format!("{}\n{}", score_file, end.as_secs());
+        fs::write("./highscore.dat", &new_score_file)
+          .expect("highscore.datの書き込みに失敗しました");
+      }
       break;
     }
   }
