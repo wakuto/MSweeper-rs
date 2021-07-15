@@ -1,5 +1,5 @@
-use std::io::Write;
-use rand::{Rng, thread_rng};
+//use rand::{Rng, thread_rng};
+use rand::{seq::SliceRandom, thread_rng};
 use ncurses::*;
 
 
@@ -20,37 +20,6 @@ struct Point {
 impl Point {
   fn new(x: usize, y: usize) -> Point {
     Point { x: x, y: y }
-  }
-
-  /// 標準入力からpointを生成します
-  fn input() -> Point {
-    let mut x;
-    let mut y;
-    let xx;
-    loop {
-      print!("x >");
-      std::io::stdout().flush().unwrap();
-      x = String::new();
-      std::io::stdin().read_line(&mut x).expect("標準入力に失敗しました。");
-      xx = match x.trim().parse::<usize>() {
-        Ok(val) => val,
-        _ => continue,
-      };
-      break;
-    }
-    let yy;
-    loop {
-      print!("y >");
-      std::io::stdout().flush().unwrap();
-      y = String::new();
-      std::io::stdin().read_line(&mut y).expect("標準入力に失敗しました。");
-      yy = match y.trim().parse::<usize>() {
-        Ok(val) => val,
-        _ => continue,
-      };
-      break;
-    }
-    Point::new(xx, yy)
   }
 }
 
@@ -92,14 +61,7 @@ impl Field {
     }
 
     // shuffle
-    cord_idx = 0;
-    while cord_idx < cordinate.len() {
-      let rand_idx = rng.gen_range(0..cordinate.len()) as usize;
-      let tmp = cordinate[rand_idx];
-      cordinate[rand_idx] = cordinate[cord_idx];
-      cordinate[cord_idx] = tmp;
-      cord_idx += 1;
-    }
+    cordinate.shuffle(&mut rng);
 
     // set mine
     cord_idx = 0;
@@ -166,19 +128,6 @@ impl Field {
     }
     
     count as u8
-  }
-
-  fn print_debug(&self) {
-    for y in 0..self.y_size {
-      for x in 0..self.x_size {
-        print!("{} ", match &self.field[y][x] {
-          Dot::Mine => "x".to_string(),
-          Dot::Safe(i) => i.to_string(),
-          _ => "_".to_string(),
-        });
-      }
-      println!("");
-    }
   }
 
   fn print(&self) {
@@ -255,6 +204,11 @@ impl Field {
       self.opennum += 1;
 
       let (up, right, down, left) = self.get_around(pos);
+      let mut direction: Vec<Point> = vec![Point::new(right, up)];
+      let upright = Point::new(right, up);
+      let downright = Point::new(right, down);
+      let downleft = Point::new(left, down);
+      let upleft = Point::new(left, up);
       let up = Point::new(pos.x, up);
       let right = Point::new(right, pos.y);
       let down = Point::new(pos.x, down);
@@ -262,14 +216,26 @@ impl Field {
       if !self.is_opened(up) {
         self.open_if_zero(up);
       }
+      if !self.is_opened(upright) {
+        self.open_if_zero(upright);
+      }
       if !self.is_opened(right) {
         self.open_if_zero(right);
+      }
+      if !self.is_opened(downright) {
+        self.open_if_zero(downright);
       }
       if !self.is_opened(down) {
         self.open_if_zero(down);
       }
+      if !self.is_opened(downleft) {
+        self.open_if_zero(downleft);
+      }
       if !self.is_opened(left) {
         self.open_if_zero(left);
+      }
+      if !self.is_opened(upleft) {
+        self.open_if_zero(upleft);
       }
       self.open_around(pos);
     }
@@ -283,6 +249,7 @@ impl Field {
     };
     self.field[pos.y][pos.x] = Dot::Flag(exist_mine);
   }
+
   fn open_count(&self) -> u32 {
     let mut cnt = 0;
     for y in 0..self.y_size {
@@ -297,7 +264,7 @@ impl Field {
 }
 
 fn main() {
-  let window = initscr();
+  let _window = initscr();
   noecho();
   nonl();
   intrflush(stdscr(), true);
@@ -339,7 +306,6 @@ fn main() {
       break;
     }
   }
-  while getch() != KEY_QUIT {
-  }
+  while getch() != KEY_QUIT { }
   endwin();
 }
