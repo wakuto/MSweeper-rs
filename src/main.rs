@@ -5,12 +5,18 @@ use ncurses::*;
 mod internal;
 use internal::*;
 
-fn save_record(filename: &str, score_file: &str, score: u64) {
+/// 記録をスコアファイルに追記します。
+/// * `filename` - 保存するファイル名
+/// * `score` - 保存するスコア
+fn save_record(filename: &str, score: u64) {
+  let score_file = get_score_file(filename);
   let new_score_file = format!("{}\n{}", score_file, score);
   fs::write(&filename, new_score_file.trim())
     .expect("highscore.datの書き込みに失敗しました");
 }
 
+/// 記録をファイルから読み込み、文字列として返します。
+/// * `filename` - 記録のファイル名
 fn get_score_file(filename: &str) -> String {
   match fs::read_to_string(&filename) {
     Ok(val) => val.trim().to_string(),
@@ -18,6 +24,8 @@ fn get_score_file(filename: &str) -> String {
   }
 }
 
+/// 記録のうち最もはやいものを返します。
+/// * `score_file` - 記録ファイルの文字列データ
 fn get_highscore(score_file: &str) -> u64 {
   if score_file != "" {
     let score_str: Vec<&str> = score_file.split('\n').collect::<Vec<&str>>();
@@ -30,6 +38,7 @@ fn get_highscore(score_file: &str) -> u64 {
   }
 }
 
+/// ncursesの初期化を行います。
 fn ncurses_setup() {
   initscr();
   noecho();
@@ -40,6 +49,8 @@ fn ncurses_setup() {
   refresh();
 }
 
+/// コマンドライン引数からフィールドのサイズ、地雷の数を受け取り、タプルとして返します。
+/// 戻り値の形式：(x_size: usize, y_size: usize, mines: u32, scoreable: bool);
 fn get_args() -> (usize, usize, u32, bool) {
   let args: Vec<String> = env::args().collect();
   let (x_size, y_size, mines, scoreable);
@@ -96,18 +107,18 @@ fn main() {
     // キー入力
     match getch() {
       KEY_RIGHT => if x < field.x_size-1 {x += 1},
-      KEY_LEFT => if x > 0 {x -= 1},
-      KEY_DOWN => if y < field.y_size-1 {y += 1},
-      KEY_UP => if y > 0 {y -= 1},
-      KEY_OPEN => {is_mine = field.open(Point::new(x, y));},
-      KEY_QUIT => {endwin(); return;},
-      KEY_FLAG => {field.set_flag(Point::new(x, y));},
+      KEY_LEFT  => if x > 0 {x -= 1},
+      KEY_DOWN  => if y < field.y_size-1 {y += 1},
+      KEY_UP    => if y > 0 {y -= 1},
+      KEY_OPEN  => {is_mine = field.open(Point::new(x, y));},
+      KEY_QUIT  => {endwin(); return;},
+      KEY_FLAG  => {field.set_flag(Point::new(x, y));},
       _ => continue,
     };
 
     // 負け
     if !is_mine {
-      mv((y_size+fieldpos.y+5) as i32, 0);
+      mv(1, 0);
       waddstr(stdscr(), "You Lose...");
       break;
     }
@@ -115,9 +126,9 @@ fn main() {
     if (field_size - field.open_count()) == field.mines as u32 {
       let end = start.elapsed();
 
-      mv((y_size+fieldpos.y+5) as i32, 0);
+      mv(1, 0);
       waddstr(stdscr(), "You Win!!!");
-      mv((y_size+fieldpos.y+6) as i32, 0);
+      mv(2, 0);
       waddstr(stdscr(), &format!("Time:{}s", end.as_secs()));
 
       if scoreable {
@@ -125,10 +136,10 @@ fn main() {
         let score_file = get_score_file(&filename);
         let score = end.as_secs();
         if get_highscore(&score_file) > score {
-          mv((y_size+fieldpos.y+7) as i32, 0);
+          mv(3, 0);
           waddstr(stdscr(), "highscore!!!");
         }
-        save_record(&filename, &score_file, score);
+        save_record(&filename, score);
       }
       break;
     }
