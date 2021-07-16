@@ -10,7 +10,7 @@ pub enum Dot {
   Safe(u8),
   /// 地雷が存在することを示すフラグ(フラグを立てる前の値)
   Flag(Box<Dot>),
-  /// 地雷が存在するかわからないことを示すフラグ(フラグを立てる前の値)
+  /// 地雷が存在するかわからないことを示すマーカー(マーカーを置く前の値)
   Unknown(Box<Dot>),
   /// 初期化時用のNull
   Null,
@@ -215,9 +215,13 @@ impl Field {
     if pos.x >= self.x_size || pos.y >= self.y_size {
       return true;
     }
-    let res = match &self.field[pos.y][pos.x] {
-      Dot::Mine => false,
-      _ => true,
+
+    let res;
+    match &self.field[pos.y][pos.x] {
+      Dot::Mine => {res = false;},
+      Dot::Flag(_) => {return true;},
+      Dot::Unknown(_) => {return true;},
+      _ => {res = true;},
     };
     if self.field[pos.y][pos.x] == Dot::Safe(0) {
       self.open_if_zero(pos);
@@ -283,7 +287,7 @@ impl Field {
     }
   }
 
-  /// `pos`で指定された座標に地雷が存在するかわからないことを示すフラグを立てます。
+  /// `pos`で指定された座標に地雷が存在するかわからないことを示すマーカーを置きます。
   /// * `pos` - フィールド上の位置
   pub fn set_unknown(&mut self, pos: Point) {
     if !self.opened[pos.y][pos.x] {

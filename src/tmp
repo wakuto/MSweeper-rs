@@ -1,0 +1,56 @@
+メソッドの定義：pub fn new(x_size: usize, y_size: usize, mines: u32, pos: Point) -> Field
+詳細：新しいフィールドを生成します。
+引数：
+x_size：フィールドの横幅
+y_size：フィールドの縦幅
+mines：フィールドに生成される地雷の数
+pos：フィールドが設置される画面上の位置
+
+メソッドの定義：fn init(&mut self)
+詳細：new()によって渡されたパラメータをもとにフィールドを初期化します。
+
+メソッドの定義：fn get_around(&self, pos: Point) -> (usize, usize, usize, usize)
+詳細：posで指定された座標の周囲８マスを調べ、(up, right, down, left)の順番で有効な座標を返します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn count_mine(&self, pos: Point) -> u8
+詳細：posで指定された座標の周囲８マスに含まれる地雷の数を返します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn print(&self)
+詳細：フィールドを枠とともに描画します。
+
+メソッドの定義：fn is_opened(&self, pos: Point) -> bool
+詳細：posで指定された座標がすでに開放されているかを返します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn open(&mut self, pos: Point) -> bool
+詳細：posで指定された座標を開放し、その周囲も開放できることが自明である場合は開放します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：fn open_around(&mut self, pos: Point)
+詳細：posで指定された座標の周囲８マスを開放します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：fn open_if_zero(&mut self, pos: Point) -> bool
+詳細：posで指定された座標に地雷がなく、周囲８マスに地雷が存在しない場合は周囲も再帰的に開放します。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn set_flag(&mut self, pos: Point)
+詳細：posで指定された座標に地雷が存在することを示すフラグを立てます。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn set_unknown(&mut self, pos: Point)
+詳細：posで指定された座標に地雷が存在するかわからないことを示すフラグを立てます。
+引数：
+pos：フィールド上の位置
+
+メソッドの定義：pub fn open_count(&self) -> u32
+詳細：すでに開放されているマスの数を返します。

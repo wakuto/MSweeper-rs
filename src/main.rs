@@ -45,6 +45,7 @@ fn ncurses_setup() {
   nonl();
   intrflush(stdscr(), true);
   keypad(stdscr(), true);
+  mousemask((BUTTON1_CLICKED | BUTTON2_CLICKED | BUTTON3_CLICKED) as u32, None);
   waddstr(stdscr(), "***MSweeper***");
   refresh();
 }
@@ -61,6 +62,11 @@ fn get_args() -> (usize, usize, u32, bool) {
       .expect("不正な引数です。x_size y_size minesの順に指定してください。");
     mines = args[3].parse()
       .expect("不正な引数です。x_size y_size minesの順に指定してください。");
+    if x_size <= 3 || y_size <= 3 || x_size >= 80 || y_size >= 80
+      || ((x_size*y_size)as i32 - mines as i32) < 5 {
+        endwin();
+        panic!("不正な引数です。 フィールドサイズか地雷の数が不適切です。");
+    }
     scoreable = false;
   } else {
     x_size = 10;
@@ -90,7 +96,7 @@ fn main() {
 
   mv((y_size+fieldpos.y+2) as i32,0);
   waddstr(stdscr(),
-    &format!("open:{}, flag:{}, unknown:{}, move:hjkl, quit:{}",
+    &format!("open:{} or left click\nflag:{} or right click\nunknown:{} or middle click\nmove:hjkl\nquit:{}",
       std::char::from_u32(KEY_OPEN as u32).unwrap(),
       std::char::from_u32(KEY_FLAG as u32).unwrap(),
       std::char::from_u32(KEY_UNKNOWN as u32).unwrap(),
@@ -102,6 +108,7 @@ fn main() {
   let mut y = 0;
   let mut is_mine = true;
   let start = Instant::now();
+  let mut mouse: MEVENT = MEVENT{ id: 0, x: 0, y: 0, z: 0, bstate: 0 };
   loop {
     field.print();
     mv((field.position.y + y) as i32, (field.position.x + x) as i32);
@@ -116,6 +123,26 @@ fn main() {
       KEY_QUIT     => {endwin(); return;},
       KEY_FLAG     => {field.set_flag(Point::new(x, y));},
       KEY_UNKNOWN  => {field.set_unknown(Point::new(x, y));},
+      KEY_MOUSE    => {
+        if getmouse(&mut mouse) == OK {
+
+          let mx = mouse.x - fieldpos.x as i32;
+          let my = mouse.y - fieldpos.y as i32;
+          if mx >= 0 && mx < field.x_size as i32 && my >= 0 && my < field.y_size as i32 {
+            x = mx as usize;
+            y = my as usize;
+            if mouse.bstate == BUTTON1_CLICKED as u32 {
+              is_mine = field.open(Point::new(x, y));
+            }
+            if mouse.bstate == BUTTON3_CLICKED as u32 {
+              field.set_flag(Point::new(x, y));
+            }
+            if mouse.bstate == BUTTON2_CLICKED as u32 {
+              field.set_unknown(Point::new(x, y));
+            }
+          }
+        }
+      },
       _ => continue,
     };
 
