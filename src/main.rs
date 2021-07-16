@@ -79,19 +79,21 @@ fn main() {
   let mut field = Field::new(x_size,y_size,mines,fieldpos);
   let field_size = (x_size * y_size) as u32;
 
-  const KEY_QUIT:  i32 = b'q' as i32;
-  const KEY_OPEN:  i32 = b'o' as i32;
-  const KEY_FLAG:  i32 = b'f' as i32;
-  const KEY_LEFT:  i32 = b'h' as i32;
-  const KEY_DOWN:  i32 = b'j' as i32;
-  const KEY_UP:    i32 = b'k' as i32;
-  const KEY_RIGHT: i32 = b'l' as i32;
+  const KEY_QUIT:    i32 = b'q' as i32;
+  const KEY_OPEN:    i32 = b'o' as i32;
+  const KEY_FLAG:    i32 = b'f' as i32;
+  const KEY_UNKNOWN: i32 = b'?' as i32;
+  const KEY_LEFT:    i32 = b'h' as i32;
+  const KEY_DOWN:    i32 = b'j' as i32;
+  const KEY_UP:      i32 = b'k' as i32;
+  const KEY_RIGHT:   i32 = b'l' as i32;
 
   mv((y_size+fieldpos.y+2) as i32,0);
   waddstr(stdscr(),
-    &format!("open:{}, flag:{}, move:hjkl, quit:{}",
+    &format!("open:{}, flag:{}, unknown:{}, move:hjkl, quit:{}",
       std::char::from_u32(KEY_OPEN as u32).unwrap(),
       std::char::from_u32(KEY_FLAG as u32).unwrap(),
+      std::char::from_u32(KEY_UNKNOWN as u32).unwrap(),
       std::char::from_u32(KEY_QUIT as u32).unwrap()
     )
   );
@@ -106,13 +108,14 @@ fn main() {
 
     // キー入力
     match getch() {
-      KEY_RIGHT => if x < field.x_size-1 {x += 1},
-      KEY_LEFT  => if x > 0 {x -= 1},
-      KEY_DOWN  => if y < field.y_size-1 {y += 1},
-      KEY_UP    => if y > 0 {y -= 1},
-      KEY_OPEN  => {is_mine = field.open(Point::new(x, y));},
-      KEY_QUIT  => {endwin(); return;},
-      KEY_FLAG  => {field.set_flag(Point::new(x, y));},
+      KEY_RIGHT    => if x < field.x_size-1 {x += 1},
+      KEY_LEFT     => if x > 0 {x -= 1},
+      KEY_DOWN     => if y < field.y_size-1 {y += 1},
+      KEY_UP       => if y > 0 {y -= 1},
+      KEY_OPEN     => {is_mine = field.open(Point::new(x, y));},
+      KEY_QUIT     => {endwin(); return;},
+      KEY_FLAG     => {field.set_flag(Point::new(x, y));},
+      KEY_UNKNOWN  => {field.set_unknown(Point::new(x, y));},
       _ => continue,
     };
 

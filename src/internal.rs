@@ -10,6 +10,8 @@ pub enum Dot {
   Safe(u8),
   /// 地雷が存在することを示すフラグ(フラグを立てる前の値)
   Flag(Box<Dot>),
+  /// 地雷が存在するかわからないことを示すフラグ(フラグを立てる前の値)
+  Unknown(Box<Dot>),
   /// 初期化時用のNull
   Null,
 }
@@ -185,6 +187,7 @@ impl Field {
           false => {
             match &self.field[y][x] {
               Dot::Flag(_) => "f".to_string(),
+              Dot::Unknown(_) => "?".to_string(),
               _ => ".".to_string(),
             }
           },
@@ -274,7 +277,20 @@ impl Field {
     if !self.opened[pos.y][pos.x] {
       self.field[pos.y][pos.x] = match &self.field[pos.y][pos.x] {
         Dot::Flag(f) => (**f).clone(),
+        Dot::Unknown(f) => Dot::Flag((*f).clone()),
         _ => Dot::Flag(Box::new(self.field[pos.y][pos.x].clone())),
+      }
+    }
+  }
+
+  /// `pos`で指定された座標に地雷が存在するかわからないことを示すフラグを立てます。
+  /// * `pos` - フィールド上の位置
+  pub fn set_unknown(&mut self, pos: Point) {
+    if !self.opened[pos.y][pos.x] {
+      self.field[pos.y][pos.x] = match &self.field[pos.y][pos.x] {
+        Dot::Flag(f) => Dot::Unknown((*f).clone()),
+        Dot::Unknown(f) => (**f).clone(),
+        _ => Dot::Unknown(Box::new(self.field[pos.y][pos.x].clone())),
       }
     }
   }
